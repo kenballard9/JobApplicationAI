@@ -1,6 +1,11 @@
 import re
 from pathlib import Path
 
+from dropdown_handler import (
+    is_custom_dropdown,
+    fill_custom_dropdown
+)
+
 
 FIELD_ALIASES = {
     "first_name": [
@@ -34,7 +39,11 @@ FIELD_ALIASES = {
         "city",
         "location city",
         "location (city)",
-        "city of residence"
+        "city of residence",
+        "current city",
+        "current location",
+        "city location",
+        "where are you located"
     ],
     "state": [
         "state",
@@ -48,7 +57,11 @@ FIELD_ALIASES = {
         "postal code"
     ],
     "country": [
-        "country"
+        "country",
+        "country of residence",
+        "country region",
+        "country of location",
+        "current country"
     ],
     "education": [
         "education",
@@ -203,6 +216,43 @@ def fill_fields(detected_fields, profile):
 
         try:
 
+            # ==========================================
+            # VERIFY CURRENT ELEMENT
+            # ==========================================
+
+            live_metadata = element.evaluate("""
+                el => ({
+                    id: el.id || "",
+                    name: el.name || "",
+                    label: Array.from(el.labels || [])
+                        .map(label => label.innerText)
+                        .join(" ")
+                        .trim(),
+                    connected: el.isConnected,
+                    tag: el.tagName.toLowerCase(),
+                    type: el.type || ""
+                })
+            """)
+
+            if not live_metadata["connected"]:
+
+                print(f"DETACHED: {field_name}")
+                skipped += 1
+                continue
+
+            if identify_field({
+                **metadata,
+                **live_metadata
+            }) != profile_key:
+
+                print(f"SKIPPED: Field identity changed - {field_name}")
+                skipped += 1
+                continue
+
+            # ==========================================
+            # FILE ATTACHMENTS
+            # ==========================================
+
             if metadata["type"] == "file":
 
                 if profile_key != "resume_path":
@@ -217,6 +267,69 @@ def fill_fields(detected_fields, profile):
                     str(file_path)
                 )
 
+            # ==========================================
+            # CUSTOM DROPDOWN MENUS
+            # ==========================================
+
+            elif (
+                profile_key in [
+                    "country",
+                    "state",
+                    "city"
+                ]
+                and metadata["tag"] != "select"
+                and is_custom_dropdown(element)
+            ):
+
+                success = fill_custom_dropdown(
+                    element,
+                    profile_key,
+                    value,
+                    profile
+                )
+
+                if not success:
+
+                    print(
+                        f"SKIPPED DROPDOWN: {field_name}"
+                    )
+
+                    skipped += 1
+                    continue
+
+            # ==========================================
+            # STANDARD HTML DROPDOWN MENUS
+            # ==========================================
+
+            elif metadata["tag"] == "select":
+
+                try:
+
+                    element.select_option(
+                        label=str(value),
+                        timeout=2000
+                    )
+
+                except Exception:
+
+                    if profile_key == "state":
+
+                        element.select_option(
+                            value=profile["state_abbreviation"],
+                            timeout=2000
+                        )
+
+                    else:
+
+                        element.select_option(
+                            value=str(value),
+                            timeout=2000
+                        )
+
+            # ==========================================
+            # TEXT BOXES AND TEXT AREAS
+            # ==========================================
+
             elif metadata["type"] in [
                 "text",
                 "email",
@@ -226,34 +339,22 @@ def fill_fields(detected_fields, profile):
                 "textarea"
             ] or metadata["tag"] == "textarea":
 
-                live_metadata = element.evaluate("""
-                    el => ({
-                        id: el.id || "",
-                        name: el.name || "",
-                        label: Array.from(el.labels || [])
-                            .map(label => label.innerText)
-                            .join(" ")
-                            .trim(),
-                        connected: el.isConnected
-                    })
-                """)
-
-                if not live_metadata["connected"]:
-
-                    print(f"DETACHED: {field_name}")
-                    skipped += 1
-                    continue
+                # Verify LinkedIn and GitHub labels.
 
                 if profile_key in ["linkedin", "github"]:
 
-                    current_label = (
-                        live_metadata["label"].lower()
-                    )
+                    current_label = element.evaluate("""
+                        el => Array.from(el.labels || [])
+                            .map(label => label.innerText)
+                            .join(" ")
+                            .trim()
+                            .toLowerCase()
+                    """)
 
                     print("\nSOCIAL PROFILE VERIFICATION")
                     print(f"Profile key: {profile_key}")
                     print(f"Original label: {metadata['label']}")
-                    print(f"Current label: {live_metadata['label']}")
+                    print(f"Current label: {current_label}")
                     print(f"Original ID: {metadata['id']}")
                     print(f"Current ID: {live_metadata['id']}")
 
@@ -268,7 +369,7 @@ def fill_fields(detected_fields, profile):
                         and "github" in current_label
                     ):
 
-                        print("SKIPPED: Ambiguous label")
+                        print("SKIPPED: Ambiguous profile field")
                         skipped += 1
                         continue
 
@@ -277,80 +378,9 @@ def fill_fields(detected_fields, profile):
                     timeout=5000
                 )
 
-            elif metadata["type"] in [
-                "text",
-                "email",
-                "tel",
-                "url",
-                "number",
-                "textarea"
-            ] or metadata["tag"] == "textarea":
-
-                live_metadata = element.evaluate("""
-                    el => ({
-                        id: el.id || "",
-                        name: el.name || "",
-                        label: Array.from(el.labels || [])
-                            .map(label => label.innerText)
-                            .join(" ")
-                            .trim()
-                    })
-                """)
-
-                print("\nFIELD VERIFICATION")
-                print(f"Original label: {metadata['label']}")
-                print(f"Original ID: {metadata['id']}")
-                print(f"Current label: {live_metadata['label']}")
-                print(f"Current ID: {live_metadata['id']}")
-                print(f"Profile key: {profile_key}")
-
-                if profile_key in ["linkedin", "github"]:
-
-                    current_label = (
-                        live_metadata["label"].lower()
-                    )
-
-                    if profile_key not in current_label:
-
-                        print(
-                            "SKIPPED: Current label does "
-                            "not match the profile key."
-                        )
-
-                        skipped += 1
-                        continue
-
-                if profile_key in ["linkedin", "github"]:
-
-                    current_label = element.evaluate("""
-                        el => Array.from(el.labels || [])
-                            .map(label => label.innerText)
-                            .join(" ")
-                            .trim()
-                            .toLowerCase()
-                    """)
-
-                    if profile_key not in current_label:
-
-                        print(
-                            f"SKIPPED: Label mismatch "
-                            f"for {profile_key}"
-                        )
-
-                        skipped += 1
-                        continue
-
-                    if (
-                        "linkedin" in current_label
-                        and "github" in current_label
-                    ):
-
-                        print("SKIPPED: Ambiguous profile field")
-
-                        skipped += 1
-                        continue
-
-                element.fill(str(value))
+            # ==========================================
+            # UNSUPPORTED FIELD TYPES
+            # ==========================================
 
             else:
 
