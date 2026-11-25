@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test Job Application</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f1f5f9;
+        max-width: 650px;
+        margin: 40px auto;
+        padding: 20px;
+      }
+
+      form {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px #00000015;
+      }
+
+      label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding: 10px;
+        margin-top: 5px;
+        box-sizing: border-box;
+      }
+
+      button {
+        margin-top: 25px;
+        padding: 12px 24px;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1>Job Application</h1>
+    <p>Business Intelligence Developer</p>
+
+    <form>
+      <label for="given_name">First Name</label>
+      <input id="given_name" required />
+
+      <label for="surname">Last Name</label>
+      <input id="surname" required />
+
+      <label for="contact_email">Email Address</label>
+      <input id="contact_email" type="email" required />
+
+      <label for="mobile">Phone Number</label>
+      <input id="mobile" type="tel" />
+
+      <label for="location_city">City</label>
+      <input id="location_city" />
+
+      <label for="location_state">State</label>
+      <select id="location_state">
+        <option value="">Select State</option>
+        <option value="KY">Kentucky</option>
+        <option value="IN">Indiana</option>
+        <option value="OH">Ohio</option>
+      </select>
+
+      <label for="postal">ZIP Code</label>
+      <input id="postal" />
+
+      <label for="profile_url">LinkedIn Profile</label>
+      <input id="profile_url" type="url" />
+
+      <label for="compensation">Desired Salary</label>
+      <input id="compensation" type="number" />
+
+      <label for="cv">Upload Resume</label>
+      <input id="cv" type="file" accept=".pdf" />
+
+      <button type="button">Submit Application</button>
+    </form>
+  </body>
+</html>
